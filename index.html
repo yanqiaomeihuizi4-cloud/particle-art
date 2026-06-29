@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Particle Art</title>
+<style>
+  html, body {
+    margin: 0;
+    overflow: hidden;
+    background: #0a0a12;
+    cursor: crosshair;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    color: #cfd2ff;
+    font-family: sans-serif;
+    font-size: 13px;
+    background: rgba(20,20,30,0.55);
+    padding: 10px 14px;
+    border-radius: 10px;
+    line-height: 1.6;
+    user-select: none;
+  }
+  #ui b { color: #fff; }
+  input[type="range"] { vertical-align: middle; }
+  button {
+    background: #3a3a5a;
+    color: #fff;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button:hover { background: #51518a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div><b>マウス/タッチを動かして描こう</b></div>
+  <div>色相: <input id="hue" type="range" min="0" max="360" value="200"></div>
+  <div>サイズ: <input id="size" type="range" min="1" max="8" value="3"></div>
+  <div>軌跡の残り: <input id="trail" type="range" min="2" max="20" value="8"></div>
+  <button id="clear">画面をクリア</button>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const hueInput = document.getElementById('hue');
+const sizeInput = document.getElementById('size');
+const trailInput = document.getElementById('trail');
+document.getElementById('clear').onclick = () => ctx.clearRect(0, 0, W, H);
+
+let particles = [];
+let mouse = { x: W / 2, y: H / 2, px: W / 2, py: H / 2, down: false };
+
+function spawn(x, y, vx, vy) {
+  const hue = (+hueInput.value + Math.random() * 40 - 20 + 360) % 360;
+  particles.push({
+    x, y,
+    vx: vx + (Math.random() - 0.5) * 2,
+    vy: vy + (Math.random() - 0.5) * 2,
+    life: 1,
+    hue,
+    size: +sizeInput.value * (0.5 + Math.random())
+  });
+}
+
+function pointerMove(x, y) {
+  mouse.px = mouse.x; mouse.py = mouse.y;
+  mouse.x = x; mouse.y = y;
+  const dx = mouse.x - mouse.px;
+  const dy = mouse.y - mouse.py;
+  const speed = Math.hypot(dx, dy);
+  const count = Math.min(6, 1 + speed * 0.3);
+  for (let i = 0; i < count; i++) {
+    spawn(mouse.x, mouse.y, dx * 0.1, dy * 0.1);
+  }
+}
+
+window.addEventListener('mousemove', e => pointerMove(e.clientX, e.clientY));
+window.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  pointerMove(t.clientX, t.clientY);
+}, { passive: false });
+
+function explode(x, y) {
+  const baseHue = +hueInput.value;
+  const count = 80;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.2;
+    const speed = 3 + Math.random() * 9;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      hue: (baseHue + Math.random() * 80 - 40 + 360) % 360,
+      size: (+sizeInput.value) * (0.8 + Math.random() * 1.5)
+    });
+  }
+}
+
+window.addEventListener('click', e => explode(e.clientX, e.clientY));
+window.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  explode(t.clientX, t.clientY);
+}, { passive: true });
+
+function tick() {
+  ctx.fillStyle = `rgba(10,10,18,${0.25 - (+trailInput.value) * 0.01})`;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.02;
+    p.vx *= 0.99;
+    p.life -= 0.012;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    ctx.beginPath();
+    ctx.fillStyle = `hsla(${p.hue}, 90%, 65%, ${p.life})`;
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
